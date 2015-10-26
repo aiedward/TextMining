@@ -23,13 +23,9 @@ fn_tm_roles <- function(tmResult){
 }
 
 ## TM_Doc_Type
-
 fn_tm_spam_yn <- function(tmResult){
- tm_doc_type <-
- tmResult %>%
-  group_by(crawl_data_id, spam_yn) %>%
-  summarise(sumCount=sum(count))
- tm_doc_type <- select(tm_doc_type, -(sumCount))
+ tm_doc_type <- tmResult %>% group_by(crawl_data_id, spam_yn) %>% summarise(sumCount=sum(count))
+ tm_doc_type <- subset(tm_doc_type, select=(-sumCount))
  return(tm_doc_type)
 }
 
@@ -44,6 +40,19 @@ fn_makeDTM <- function(tm_keys,sparseTerm){
  return(dtmDf)
 }
 
+## Make TF-IDF DTM
+fn_makeTfIdfDTM <- function(tm_keys,sparseTerm){
+ corp <- Corpus(DataframeSource(tm_keys))
+ dtm <- DocumentTermMatrix(corp,
+                           control=list(weighting=weightTfIdf,
+                                        removeNumbers=TRUE,
+                                        wordLengths=c(2,Inf)))
+ dtm <- removeSparseTerms(dtm, sparseTerm)
+ dtmDf <- as.data.frame(as.matrix(dtm))
+ return(dtmDf)
+}
+
+
 ##LDA_Result_change_for Qlikview
 fn_LDA_Result_for_QV <- function(term_topic){
  temp <-NULL
@@ -57,6 +66,22 @@ fn_LDA_Result_for_QV <- function(term_topic){
     }
   }
  
+ return(output)
+}
+
+##LDA_Result_change_for Qlikview
+fn_LDA_term_Result_for_QV <- function(phi){
+ temp <-NULL
+ output<-NULL
+
+ for(i in 1:ncol(phi)){
+   for(j in 1:nrow(phi)){
+    temp$topicNo <- j
+    temp$keyword <- noquote(colnames(phi)[i])
+    temp$termProb <- phi[j,i]
+    output <-  rbind(output,temp)
+    }
+  }
  return(output)
 }
 

@@ -3,7 +3,7 @@ require(stringi)
 require(data.table)
 
 ## Load model data
-load(file="predict_svm_results_db.RData")
+load(file="predict_svm_results_forVal.RData")
 
 ## 예측결과 -> modelResult 변수 사용
 
