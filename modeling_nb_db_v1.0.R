@@ -5,7 +5,7 @@ start.time <- Sys.time()
 source("/home/ruser/TextPrism/RSource/ML_functions.R")
 
 #package check & install & load
-libraryList <- c("dplyr","stringi","tm","caret","reshape","RODBC","RODBCext","randomForest","doMC")
+libraryList <- c("dplyr","stringi","tm","caret","reshape","RODBC","RODBCext","randomForest","doMC","klaR")
 
 for(lib in libraryList){
   package.checking <- find.package(lib,quiet=TRUE)
@@ -17,17 +17,17 @@ require(dplyr)
 require(stringi)
 require(tm)
 require(caret)
+require(klaR)
 require(reshape)
 require(RODBC)
 require(RODBCext)
-require(randomForest)
 require(doMC)
 #require(e1071)
 
 ##### Option #####
 tfIdf <- FALSE
 sparseRatio <- 0.997
-modelNumber <- "test"
+modelNumber <- "110_NB"
 registerDoMC(cores = 5)
 
 ############################################
@@ -65,23 +65,9 @@ noDocidTotal <- subset(total, select=(-crawl_data_id))
 ## Train models
 ############################################
 print(paste("Creating Model  #", modelNumber))
-##SVM##
-cvtrain <- trainControl(method="cv", number=5, classProbs = TRUE)
-grid <- data.frame(.C=c(0.001))
-spamModel <- train(spam_yn ~ ., data=noDocidTotal, method="svmLinear",	
-                  trControl=cvtrain,	
-                  tuneGrid=grid,	
-                  metric="Accuracy",	
-                  preProc=c("center", "scale"))	
 
-##RandomForest##
-#cvtrain <- trainControl(method="cv", number=5)
-#grid <- expand.grid(ntree=100, importance=TRUE, mtry=3)
-#spamModel <- train(spam_yn ~ ., data=noDocidTotal, method="parRF",
-#                      trControl=cvtrain,
-#                      tuneGrid=data.frame(mtry=5),
-#                      metric="Accuracy",
-#                      preProc=c("center", "scale"))             
+spamModel <- naiveBayes(noDocidTotal, noDocidTotal$spam_yn,laplace = 3)
+#spamModel <- NaiveBayes(spam_yn ~ ., data=noDocidTotal, fL=3, na.action = na.pass)
 
 print(spamModel)
 end.time <- Sys.time()
