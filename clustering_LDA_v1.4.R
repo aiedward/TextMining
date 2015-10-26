@@ -66,23 +66,11 @@ tm<-sqlQuery(conn,stringQuery)
 #tm<-sqlQuery(conn, 'select crawl_data_id, keyword, ranking as count, role from trendtracker.t_tp_result_rank  where user="home_blog" and role <> "blank";')
 odbcClose(conn)
 
-tm<-subset(tm,subset=(tm$keyword!="메르스" & tm$keyword!="이동하다" & tm$keyword!="언론사" & tm$keyword!="뉴스" & tm$keyword!="재배포" & tm$keyword!="금지" & tm$keyword!="관련" & tm$keyword!="아니다" & tm$keyword!="지도앱"& tm$keyword!="검색"& tm$keyword!="po"& tm$keyword!="point"))
+tm<-subset(tm,subset=(tm$keyword!="메르스" & tm$keyword!="이동하다" & tm$keyword!="언론사" & tm$keyword!="뉴스" & tm$keyword!="재배포" & tm$keyword!="금지" & tm$keyword!="관련" & tm$keyword!="아니다" ))
 
 ## TM results into document keywords matrices
 print("Make DTM")
-
 tmKeyword <- fn_tm_keys(tm)
-print(paste("Total Document :",nrow(tmKeyword)))
-
-##Manual Spam Check
-spamDocId <- read.table(file="spamDocId.txt", header=TRUE)
-spamCheck <- tmKeyword$crawl_data_id %in% spamDocId$spamDocId
-tmKeyword <- tmKeyword[!spamCheck,]
-
-##Duplication Check
-dupCheck <- duplicated(tmKeyword[,2])
-tmKeyword <- tmKeyword[!dupCheck,]
-
 print(paste("Target Document :",nrow(tmKeyword)))
 corp<-Corpus(DataframeSource(tmKeyword))
 dtm<-DocumentTermMatrix(corp, control=list(removeNumbers=TRUE, wordLengths=c(2,Inf)))
