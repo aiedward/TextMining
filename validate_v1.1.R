@@ -1,7 +1,7 @@
 rm(list=ls())
 gc()
 
-start.time <- Sys.time()dddd
+start.time <- Sys.time()
 
 libraryList <- c("dplyr","stringi","tm","caret","data.table","reshape","RODBC","RODBCext")
 

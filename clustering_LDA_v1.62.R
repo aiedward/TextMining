@@ -1,7 +1,10 @@
 rm(list=ls())
+gc()
 
 start.time <- Sys.time()
-source("./ML_functions.R")
+source("/home/ruser/TextPrism/RSource/ML_functions.R")
+source("/home/ruser/TextPrism/RSource/createNamJson.R")
+source("/home/ruser/TextPrism/RSource/config_LDA.R")
 
 #package check & install & load
 libraryList <- c("dplyr","stringi","tm","caret","reshape","lsa","RODBC","RODBCext","topicmodels","servr","LDAvis")
@@ -23,61 +26,60 @@ require(RODBC)
 require(RODBCext)
 require(servr)
 require(LDAvis)
+require(doParallel)
 
-############################################
-## Read in TM results
-############################################
+registerDoParallel()
 
-#get parameters
-arg <- commandArgs()
-name <- arg[6] #analysis name
-sparse <- arg[7]
 sparseRe <- gsub("0.","_",sparse)
-k<- arg[8] #number of topic
-
-visual <- "NO_Visual"
-if(is.na(arg[9]))
-{
-  print("NO Visualization")
-}else
-{
-  visual <- arg[9]
-} 
-
 print(visual)
 print(name)
 print(paste("Sparse Term Ratio :",sparse))
 print(paste("Number of Cluster:",k))
 print(Sys.time())
 
+
+
+############################################
+## Read in TM results
+############################################
+
 #DB Connection
 print("Connect DB")
 conn <- odbcConnect('smartSMA_Development_New',uid='trendtracker',pwd='#tt1234')
+#conn <- odbcConnect('Alibaba',uid='trendtracker',pwd='#tt1234')
 print("Loading Data from DB")
 
-#stringQuery <- paste('select crawl_data_id, keyword, ranking as count, role from trendtracker.t_tp_result_rank  where role <> "blank" and user="', name,'";',sep="")
-
-#stringQuery <- paste('select a.crawl_data_id, a.keyword, a.ranking as count, a.role FROM trendtracker.t_tp_result_rank_hyun a, trendtracker.t_svm_result_adhoc b where a.crawl_data_id = b.crawl_data_id and b.pred="nonspam" and b.user="', name,'";',sep="")
-
-stringQuery <- paste('select a.crawl_data_id, a.keyword, a.ranking as count, a.role FROM trendtracker.t_tp_result_rank_hyun a, trendtracker.t_svm_result_adhoc b where a.crawl_data_id = b.crawl_data_id and b.pred="nonspam" and (b.user="newSixPocket4" OR b.user="newSP_old");',sep="")
-
-tm<-sqlQuery(conn,stringQuery)
-
-#tm<-sqlQuery(conn, 'select crawl_data_id, keyword, ranking as count, role from trendtracker.t_tp_result_rank  where user="home_blog" and role <> "blank";')
+tm<-sqlQuery(conn,inputQuery)
 odbcClose(conn)
 
-tm<-subset(tm,subset=(tm$keyword!="메르스" & tm$keyword!="이동하다" & tm$keyword!="언론사" & tm$keyword!="뉴스" & tm$keyword!="재배포" & tm$keyword!="금지" & tm$keyword!="관련" & tm$keyword!="아니다" & tm$keyword!="지도앱"& tm$keyword!="검색"& tm$keyword!="po"& tm$keyword!="point"))
+#tm <- read.csv(file="/home/ruser/TextPrism/input/out_G5_youtube_dbinsert.csv")
+tm <- subset(tm,as.integer(tm$ranking)>0)
+
+#disuse.role <-c("hash","NNBJKS","SN","MAJ","UNKNOWN","MAG","VCPEC","url","SL")
+disuse.role <-c("MONEY","FW","RB","url","RP")
+
+#disuse.term <- c("하다","되다","있다","같다","좋다","자형","point","네요","the","one","pc","nc","of","to","for","in","ess","포항","청약","무주택자")
+disuse.term <- c("nm","go","year",".no","use")
+
+tm <- tm[!(tm$keyword %in% disuse.term),]
+tm <- tm[!(tm$role %in% disuse.role),]
+tm <- tm[length(tm$keyword)>1,]
+tm$keyword <- gsub(" ", "#", tm$keyword)
+
 
 ## TM results into document keywords matrices
 print("Make DTM")
-
 tmKeyword <- fn_tm_keys(tm)
 print(paste("Total Document :",nrow(tmKeyword)))
 
-##Manual Spam Check
-spamDocId <- read.table(file="spamDocId.txt", header=TRUE)
-spamCheck <- tmKeyword$crawl_data_id %in% spamDocId$spamDocId
-tmKeyword <- tmKeyword[!spamCheck,]
+####################################
+## Manual Spam Check
+####################################
+if(MSC){
+  spamDocId <- read.table(file="spamDocId.txt", header=TRUE)
+  spamCheck <- tmKeyword$crawl_data_id %in% spamDocId$spamDocId
+  tmKeyword <- tmKeyword[!spamCheck,]
+}
 
 ##Duplication Check
 dupCheck <- duplicated(tmKeyword[,2])
@@ -88,13 +90,13 @@ corp<-Corpus(DataframeSource(tmKeyword))
 dtm<-DocumentTermMatrix(corp, control=list(removeNumbers=TRUE, wordLengths=c(2,Inf)))
 dtm <- removeSparseTerms(dtm, as.numeric(sparse))
 
+##Remove low tf-idf col and row
 term_tfidf <- tapply(dtm$v/row_sums(dtm)[dtm$i], dtm$j, mean) * log2(nDocs(dtm)/col_sums(dtm > 0))
-
 new_dtm <-dtm[,term_tfidf >= 0.1]
 new_dtm <-new_dtm[row_sums(new_dtm)>0,]
 
 ############################################
-## Make Topic
+## Running LDA
 ############################################
 print("Start LDA")
 SEED <-2010
@@ -102,10 +104,10 @@ SEED <-2010
 lda_tm <- LDA(new_dtm, control=list(seed=SEED), k=as.numeric(k))
 
 doc_topic <- topics(lda_tm,1)
-term_topic <- terms(lda_tm,100)
+term_topic <- terms(lda_tm, numTermByTopic)
 
 
-write.table(term_topic, paste("./",name,sparseRe,"_",k,"_LDA_Result.csv",sep=""),sep=",", row.names=FALSE)
+write.table(term_topic, paste("/home/ruser/TextPrism/output/",name,sparseRe,"_",k,"_LDA_Result.csv",sep=""),sep=",", row.names=FALSE)
 
 
 #Doc_topic result making
@@ -127,37 +129,45 @@ id_topic <- merge(doc_topic_df, docProb_df, by="rown")
 id_topic <- merge(id_topic, tmKeyword, by="rown")
 id_topic <- subset(id_topic,select=c("rown","doc_topic","crawl_data_id","maxProb"))
 
-write.table(id_topic, paste("./",name,sparseRe,"_",k,"_raw","_LDA_Result.csv",sep=""),sep=",", row.names=FALSE)
+write.table(id_topic, paste("/home/ruser/TextPrism/output/",name,sparseRe,"_",k,"_raw","_LDA_Result.csv",sep=""),sep=",", row.names=FALSE)
 
 outPutForQV <- fn_LDA_Result_for_QV(term_topic)
-write.table(outPutForQV, paste("./",name,sparseRe,"_",k,"_QV","_LDA_Result.csv",sep=""),sep=",", row.names=FALSE)
+write.table(outPutForQV, paste("/home/ruser/TextPrism/output/",name,sparseRe,"_",k,"_QV","_LDA_Result.csv",sep=""),sep=",", row.names=FALSE)
 
-
-#Make visualization
-if(visual == "TRUE"){
+#########################################
+## Make visualization
+#########################################
+if(visual){
+  # phi is probabilities of the topics for each of the terms
 	phi <- posterior(lda_tm)$terms %>% as.matrix
+	
+	# theta is probabilities of the topics for each the document
 	theta <- posterior(lda_tm)$topics %>% as.matrix
+	#phi2 <- phi[ ,order(as.integer(colnames(phi)))]
 	vocab <- colnames(phi)
 
 	doc_length <- vector()
 	doc_topic_df<-as.data.frame(doc_topic)
 
+	#get document length
 	for( i in as.numeric(row.names(doc_topic_df))){
 	  temp <- corp[[i]]$content
 	  doc_length <- c(doc_length, nchar(temp[2]))
 	}
 
-	temp_frequency <- inspect(new_dtm)
+	temp_frequency <- as.matrix(new_dtm)
 
 	freq_matrix <- data.frame(ST = colnames(temp_frequency),
 	                          Freq = colSums(temp_frequency))
 
-	json_lda <- createJSON(phi = phi, theta = theta,
+	json_lda <- createNamJson(phi = phi, theta = theta,
         	               vocab = vocab,
                 	       doc.length = doc_length,
 	                       term.frequency = freq_matrix$Freq)
 
-	serVis(json_lda, out.dir = paste("./LDAvis_Result/",name,sparseRe,"_",k,sep=""), open.browser = FALSE)
+	#serVis(json_lda, out.dir = paste("/home/ruser/TextPrism/LDAvis_Result/",name,sparseRe,"_",k,sep=""), open.browser = FALSE)
+	##release to TOMCAT
+	serVis(json_lda, out.dir = paste("/data001/tomcat/webapps/",name,sparseRe,"_",k,sep=""), open.browser = FALSE)
 }
 end.time <- Sys.time()
 svmtraintime <- end.time - start.time
@@ -170,4 +180,4 @@ rm(tm)
 rm(start.time)
 rm(end.time)
 
-save.image(file=paste(name,sparseRe,"_",k,"_clustering_LDA_Result.RData",sep=""))
+save.image(file=paste("/home/ruser/TextPrism/output/",name,sparseRe,"_",k,"_clustering_LDA_Result.RData",sep=""))

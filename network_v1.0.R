@@ -1,4 +1,5 @@
 rm(list=ls())
+gc()
 
 #package check & install & load
 libraryList <- c("dplyr","stringi","tm","reshape","slam","igraph","network","sna")
@@ -17,7 +18,8 @@ require(slam)
 require(igraph)
 require(network)
 
-load(file="/home/ruser/TextPrism/RData/sportage_99_50_clustering_LDA_Result.RData")
+
+load(file="/home/ruser/TextPrism/output/")
 
 ##Build a Graph
 makeNetwork <- function(networkMatrix){
@@ -49,7 +51,7 @@ makeNetwork <- function(networkMatrix){
 ##topicTDM
 topicTDM <- posterior(lda_tm)$term
 
-smallTopicTDM <- topicTDM[,colSums(topicTDM)>0.03]
+smallTopicTDM <- topicTDM[,colSums(topicTDM)>0.2]
 
 smallTopicMatrix <- as.matrix(smallTopicTDM)
 smallTopicMatrix[smallTopicMatrix>=0.01] <- 1
@@ -58,7 +60,7 @@ smallTopicMatrix <-  t(smallTopicMatrix) %*% smallTopicMatrix
 
 smallTopicMatrix2 <-  smallTopicMatrix %*% t(smallTopicMatrix)
 
-makeNetwork(smallTopicMatrix)
+makeNetwork(smallTopicMatrix2)
 
 
 
