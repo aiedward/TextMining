@@ -29,20 +29,21 @@ makeCorpus <- function(inputQuery, stopTerm){
   ############################################
   #DB Connection
   print("Connect DB")
+  #conn <- odbcConnect('smartSMA_Development_New',uid='trendtracker',pwd='#tt1234')
   conn <- odbcConnect('ccaMart',uid='trendtracker',pwd='#tt1234')
-  #conn2 <- odbcConnect('smaali',uid='namyun',pwd='dighdi12')
+  #conn <- odbcConnect('smaali',uid='namyun',pwd='dighdi12')
   #conn <- odbcConnect('Alibaba',uid='trendtracker',pwd='#tt1234')
   print("Loading Data from DB")
-  
+  inputQuery = 'Select crawl_data_id, role, keyword, ranking from ccadb.t_tp_result_rank_lgu where user = \'comm_con_dev\';'
   tm<-sqlQuery(conn,inputQuery)
   odbcClose(conn)
   
   #Pre Processing
   tm$keyword <- gsub(" ", "#", tm$keyword)
-  tm$keyword <- replace(tm$keyword, (tm$keyword %in% "알파"), "알파고")
-  tm$keyword <- replace(tm$keyword, (tm$keyword %in% "알파고가"), "알파고")
-  tm$keyword <- replace(tm$keyword, (tm$keyword %in% "알파고와"), "알파고")
-  tm$keyword <- replace(tm$keyword, (tm$keyword %in% "이세돌과"), "이세돌")
+  #tm$keyword <- replace(tm$keyword, (tm$keyword %in% "알파"), "알파고")
+  #tm$keyword <- replace(tm$keyword, (tm$keyword %in% "알파고가"), "알파고")
+  #tm$keyword <- replace(tm$keyword, (tm$keyword %in% "알파고와"), "알파고")
+  #tm$keyword <- replace(tm$keyword, (tm$keyword %in% "이세돌과"), "이세돌")
   
   
   ## Stop Term ##

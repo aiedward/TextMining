@@ -5,6 +5,8 @@ start.time <- Sys.time()
 source("/home/ruser/TextPrism/RSource/ML_functions.R")
 source("/home/ruser/TextPrism/RSource/createNamJson.R")
 source("/home/ruser/TextPrism/RSource/config_LDA.R")
+source("/home/ruser/TextPrism/RSource/network_v1.1.R")
+
 
 #package check & install & load
 libraryList <- c("dplyr","stringi","tm","caret","reshape","lsa","RODBC","RODBCext","topicmodels","servr","LDAvis")
@@ -45,6 +47,7 @@ print(Sys.time())
 
 #DB Connection
 print("Connect DB")
+#conn <- odbcConnect('ccaMart',uid='trendtracker',pwd='#tt1234')
 conn <- odbcConnect('smartSMA_Development_New',uid='trendtracker',pwd='#tt1234')
 #conn <- odbcConnect('Alibaba',uid='trendtracker',pwd='#tt1234')
 print("Loading Data from DB")
@@ -55,16 +58,17 @@ odbcClose(conn)
 #tm <- read.csv(file="/home/ruser/TextPrism/input/out_G5_youtube_dbinsert.csv")
 tm <- subset(tm,as.integer(tm$ranking)>0)
 
-#disuse.role <-c("hash","NNBJKS","SN","MAJ","UNKNOWN","MAG","VCPEC","url","SL")
-disuse.role <-c("MONEY","FW","RB","url","RP")
+disuse.role <-c("hash","NNBJKS","SN","MAJ","UNKNOWN","MAG","VCPEC","url","SL","$$")
+#disuse.role <-c("$$")
 
-#disuse.term <- c("하다","되다","있다","같다","좋다","자형","point","네요","the","one","pc","nc","of","to","for","in","ess","포항","청약","무주택자")
-disuse.term <- c("nm","go","year",".no","use")
+#disuse.term <- c("하다","되다","있다","같다","좋다","자형","point","네요","the","one","pc","nc","of","to","for","in","ess","포항","청약","무주택자","vs","or"
+#                ,"mm","입니다","gg","으십니다","셔서","라는","모바","비스","mr","xl","이야","eq","se","rt","bt","be","ea","on","from","cv","nbsp","ed","eb","ac","bc")
+disuse.term <- c("nm","go","year",".no","use","autoguide.com","dx","tt","news.more","rm","$$","autocar","eos","nx","mall","st.","@media","div_*","ps","bloomberg","20ps")
 
+tm$keyword <- gsub(" ", "#", tm$keyword)
 tm <- tm[!(tm$keyword %in% disuse.term),]
 tm <- tm[!(tm$role %in% disuse.role),]
 tm <- tm[length(tm$keyword)>1,]
-tm$keyword <- gsub(" ", "#", tm$keyword)
 
 
 ## TM results into document keywords matrices
@@ -76,7 +80,7 @@ print(paste("Total Document :",nrow(tmKeyword)))
 ## Manual Spam Check
 ####################################
 if(MSC){
-  spamDocId <- read.table(file="spamDocId.txt", header=TRUE)
+  spamDocId <- read.table(file="./TextPrism/spamDocId.txt", header=TRUE)
   spamCheck <- tmKeyword$crawl_data_id %in% spamDocId$spamDocId
   tmKeyword <- tmKeyword[!spamCheck,]
 }
@@ -163,7 +167,8 @@ if(visual){
 	json_lda <- createNamJson(phi = phi, theta = theta,
         	               vocab = vocab,
                 	       doc.length = doc_length,
-	                       term.frequency = freq_matrix$Freq)
+	                       term.frequency = freq_matrix$Freq,
+        	               mds.method = canberraPCA)
 
 	#serVis(json_lda, out.dir = paste("/home/ruser/TextPrism/LDAvis_Result/",name,sparseRe,"_",k,sep=""), open.browser = FALSE)
 	##release to TOMCAT
@@ -181,3 +186,4 @@ rm(start.time)
 rm(end.time)
 
 save.image(file=paste("/home/ruser/TextPrism/output/",name,sparseRe,"_",k,"_clustering_LDA_Result.RData",sep=""))
+print(paste("http://165.243.188.249:8080/",name,sparseRe,"_",k))

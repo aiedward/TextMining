@@ -1,3 +1,9 @@
+canberraPCA <- function(x){
+  temp <- dist(x, method="canberra")
+  temp = cmdscale(temp,eig=TRUE, k=2)
+  return(temp$points)
+}
+
 createNamJson <- function (phi = matrix(), theta = matrix(), doc.length = integer(), 
           vocab = character(), term.frequency = integer(), R = 30, 
           lambda.step = 0.01, mds.method = jsPCA, cluster, plot.opts = list(xlab = "PC1", 
